@@ -2,10 +2,10 @@
   "name": "segunda_entrega_v2",
   "version": "1.0.0",
   "description": "",
+   "type": "module",
   "main": "index.js",
-  "type": "module",
   "scripts": {
-    "start": "node app.js"
+    "start": "node --watch app.js"
   },
   "keywords": [],
   "author": "",
@@ -13,6 +13,7 @@
   "dependencies": {
     "express": "^4.19.2",
     "express-handlebars": "^7.1.3",
+    "mongoose": "^8.5.3",
     "socket.io": "^4.7.5"
   }
 }

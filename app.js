@@ -4,6 +4,9 @@ import { Server } from 'socket.io';
 import { engine } from 'express-handlebars';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import mongoose from 'mongoose';
+import cartRoutes from './routes/carts.js'; // Importamos las rutas de carts
+import productRoutes from './routes/products.js'; // Importamos las rutas de products
 
 // Para obtener __dirname en ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -23,18 +26,17 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-let productos = [];
+// Conexión a MongoDB
+mongoose.connect("mongodb+srv://1234562024:1234562024@cluster0.e0kzhzg.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+    .then(() => console.log('Conectado a MongoDB'))
+    .catch(err => console.error('Error al conectar a MongoDB:', err));
 
-// End point
-app.get('/', (req, res) => {
-    res.render('home', { productos });
-});
-
-app.get('/realtimeproducts', (req, res) => {
-    res.render('realTimeProducts', { productos });
-});
+// Usar las rutas de carts y products
+app.use('/api/carts', cartRoutes);
+app.use('/api/products', productRoutes);
 
 // Manejo de conexiones socket
+let productos = [];
 io.on('connection', (socket) => {
     console.log('Nuevo cliente conectado');
 
@@ -54,6 +56,7 @@ io.on('connection', (socket) => {
     });
 });
 
+// Iniciar el servidor
 server.listen(3000, () => {
     console.log('Servidor escuchando en http://localhost:3000');
 });
