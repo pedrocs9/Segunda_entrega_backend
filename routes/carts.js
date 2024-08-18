@@ -90,4 +90,42 @@ router.get('/:cid', async (req, res) => {
     }
 });
 
+// Agregar un producto al carrito
+router.post('/:cid/products/:pid', async (req, res) => {
+    const { cid, pid } = req.params;
+    const { quantity } = req.body;
+
+    try {
+        const cart = await Cart.findById(cid);
+        if (!cart) return res.status(404).json({ status: 'error', message: 'Carrito no encontrado' });
+
+        // Verificar si el producto ya existe en el carrito
+        const existingProduct = cart.products.find(p => p.product.toString() === pid);
+        if (existingProduct) {
+            // Si el producto ya está en el carrito, actualizar la cantidad
+            existingProduct.quantity += quantity;
+        } else {
+            // Si el producto no está en el carrito, agregarlo
+            cart.products.push({ product: pid, quantity });
+        }
+
+        await cart.save();
+
+        res.json({ status: 'success', message: 'Producto agregado al carrito', cart });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: 'Error interno del servidor' });
+    }
+});
+
+// Crear un nuevo carrito
+router.post('/', async (req, res) => {
+    try {
+        const newCart = new Cart({ products: [] });
+        await newCart.save();
+        res.status(201).json({ status: 'success', cart: newCart });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: 'Error interno del servidor' });
+    }
+});
+
 export default router;

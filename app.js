@@ -5,8 +5,9 @@ import { engine } from 'express-handlebars';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import mongoose from 'mongoose';
-import cartRoutes from './routes/carts.js'; // Importamos las rutas de carts
-import productRoutes from './routes/products.js'; // Importamos las rutas de products
+import cartRoutes from './routes/carts.js';
+import productRoutes from './routes/products.js';
+import Product from './models/product.js';
 
 // Para obtener __dirname en ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -26,34 +27,83 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Conexión a MongoDB
-mongoose.connect("mongodb+srv://1234562024:1234562024@cluster0.e0kzhzg.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
-    .then(() => console.log('Conectado a MongoDB'))
-    .catch(err => console.error('Error al conectar a MongoDB:', err));
+// Conexión a MongoDB con opciones recomendadas
+mongoose.connect("mongodb+srv://1234562024:1234562024@cluster0.e0kzhzg.mongodb.net/ProyectoBackend1?retryWrites=true&w=majority&appName=Cluster0", {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+})
+.then(() => console.log('Conectado a MongoDB'))
+.catch(err => console.error('Error al conectar a MongoDB:', err));
 
 // Usar las rutas de carts y products
 app.use('/api/carts', cartRoutes);
 app.use('/api/products', productRoutes);
 
 // Manejo de conexiones socket
-let productos = [];
-io.on('connection', (socket) => {
+let productos = []; // Cambiar a let para poder reasignar
+
+// Manejo de conexiones socket
+io.on('connection', async (socket) => {
     console.log('Nuevo cliente conectado');
 
-    // Enviar lista de productos al nuevo cliente
-    socket.emit('updateProducts', productos);
+    try {
+        // Obtener la lista de productos desde la base de datos
+        const productos = await Product.find();
+
+        // Enviar lista de productos al nuevo cliente
+        socket.emit('updateProducts', productos);
+    } catch (error) {
+        console.error('Error al obtener productos de la base de datos:', error);
+    }
 
     // Escuchar la creación de un nuevo producto
-    socket.on('nuevoProducto', (producto) => {
-        productos.push(producto);
-        io.emit('updateProducts', productos);
+    socket.on('nuevoProducto', async (producto) => {
+        try {
+            // Guardar el producto en la base de datos MongoDB
+            const newProduct = new Product({
+                id: producto.id,
+                nombre: producto.nombre,
+                precio: producto.precio
+            });
+            await newProduct.save(); // Guardar en MongoDB
+
+            console.log('Producto agregado a la base de datos:', newProduct);
+
+            // Obtener la lista actualizada de productos desde la base de datos
+            const productosActualizados = await Product.find();
+
+            // Emitir a todos los clientes la lista actualizada de productos
+            io.emit('updateProducts', productosActualizados);
+
+        } catch (error) {
+            console.error('Error al agregar el producto a la base de datos:', error);
+        }
     });
 
-    // Escuchar la eliminación de un producto
-    socket.on('eliminarProducto', (id) => {
-        productos = productos.filter(producto => producto.id !== id);
-        io.emit('updateProducts', productos);
-    });
+// Escuchar la eliminación de un producto
+socket.on('eliminarProducto', async (id) => {
+    try {
+        // Convertir el ID a ObjectId correctamente usando 'new'
+        const objectId = new mongoose.Types.ObjectId(id);
+
+        // Eliminar el producto de la base de datos MongoDB usando _id
+        const deletedProduct = await Product.findByIdAndDelete(objectId);
+
+        if (deletedProduct) {
+            console.log(`Producto con ID ${id} eliminado de la base de datos.`);
+
+            // Obtener la lista actualizada de productos desde la base de datos
+            const productosActualizados = await Product.find();
+
+            // Emitir la lista actualizada a todos los clientes
+            io.emit('updateProducts', productosActualizados);
+        } else {
+            console.log(`Producto con ID ${id} no encontrado en la base de datos.`);
+        }
+    } catch (error) {
+        console.error('Error al eliminar el producto de la base de datos:', error);
+    }
+});
 });
 
 // Iniciar el servidor
